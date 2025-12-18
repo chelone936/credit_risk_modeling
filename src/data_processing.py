@@ -123,7 +123,7 @@ def get_preprocessing_pipeline(numerical_cols, categorical_cols):
     return ColumnTransformer(transformers=transformers, remainder='drop')
 
 
-def load_and_process_data(input_path, output_path=None):
+def load_and_process_data(input_path, output_path=None, keep_ids=True):
     """
     Load raw data, apply feature engineering, and optionally save.
     
@@ -133,6 +133,8 @@ def load_and_process_data(input_path, output_path=None):
         Path to raw CSV file
     output_path : str, optional
         Path to save processed data
+    keep_ids : bool, default=True
+        Whether to keep CustomerId for merging with target variables
         
     Returns:
     --------
@@ -142,6 +144,9 @@ def load_and_process_data(input_path, output_path=None):
     print(f"Loading data from {input_path}...")
     df = pd.read_csv(input_path)
     print(f"Loaded {len(df)} rows, {len(df.columns)} columns")
+    
+    # Save CustomerId if we need it later
+    customer_ids = df['CustomerId'].copy()
     
     # Apply custom feature engineering
     print("\nApplying feature engineering...")
@@ -181,6 +186,10 @@ def load_and_process_data(input_path, output_path=None):
     
     # Convert to DataFrame
     df_final = pd.DataFrame(df_processed, columns=feature_names)
+    
+    if keep_ids:
+        df_final['CustomerId'] = customer_ids.values
+        
     print(f"Final shape: {df_final.shape}")
     
     # Save if output path provided
@@ -189,6 +198,35 @@ def load_and_process_data(input_path, output_path=None):
         print(f"\nSaved processed data to {output_path}")
     
     return df_final, feature_pipeline, preprocessing_pipeline
+
+
+def apply_woe_iv(df, target_col):
+    """
+    Apply Weight of Evidence (WoE) transformation and calculate Information Value (IV).
+    Note: Requires 'xverse' library.
+    """
+    try:
+        from xverse.transformer import WOE
+        
+        print(f"\nApplying WoE transformation for target: {target_col}")
+        X = df.drop(columns=[target_col, 'CustomerId'], errors='ignore')
+        y = pd.Series(df[target_col])
+        
+        clf = WOE()
+        clf.fit(X, y)
+        
+        # Transform the data
+        df_woe = clf.transform(X)
+        
+        # Add target and ID back
+        df_woe[target_col] = y.values
+        if 'CustomerId' in df.columns:
+            df_woe['CustomerId'] = df['CustomerId'].values
+            
+        return df_woe, clf.iv_
+    except ImportError:
+        print("xverse library not found. Skipping WoE/IV transformation.")
+        return df, None
 
 
 if __name__ == "__main__":
