@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    container_name: credit_risk_api
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    environment:
+      - ENV=production
+      - MLFLOW_TRACKING_URI=http://mlflow_server:5000  # Adjust as needed
+    restart: always
+
+# Note: This assumes an external MLflow server or local volume for model storage
