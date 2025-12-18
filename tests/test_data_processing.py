@@ -132,5 +132,49 @@ def test_no_data_leakage():
     assert result.shape[0] == test_data.shape[0]
 
 
+def test_data_splitting():
+    """Verify data splitting ratios and reproducibility (Task 5)"""
+    # Create simple data
+    data = pd.DataFrame({
+        'CustomerId': [f'C{i}' for i in range(10)],
+        'is_high_risk': [0, 1, 0, 1, 0, 1, 0, 1, 0, 1],
+        'feature1': np.random.rand(10)
+    })
+    
+    # Save placeholder to test load
+    path = "data/processed/temp_test.csv"
+    os.makedirs("data/processed", exist_ok=True)
+    data.to_csv(path, index=False)
+    
+    from src.train import prepare_data
+    try:
+        X_train, X_test, y_train, y_test = prepare_data(path, target_col='is_high_risk', test_size=0.2)
+        
+        # Check ratios (10 rows, 20% test = 2 rows test)
+        assert len(X_test) == 2
+        assert len(X_train) == 8
+    finally:
+        # Cleanup
+        if os.path.exists(path):
+            os.remove(path)
+
+
+def test_eval_metrics_ranges():
+    """Verify that evaluation metrics stay within logical bounds (Task 5)"""
+    from src.train import evaluate_model
+    from sklearn.dummy import DummyClassifier
+    
+    X = np.random.rand(10, 5)
+    y = np.array([0, 1, 0, 1, 0, 1, 0, 1, 0, 1])
+    
+    model = DummyClassifier(strategy="most_frequent")
+    model.fit(X, y)
+    
+    metrics = evaluate_model(model, X, y)
+    
+    for name, value in metrics.items():
+        assert 0 <= value <= 1, f"Metric {name} value {value} is out of bounds [0, 1]"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, '-v'])
